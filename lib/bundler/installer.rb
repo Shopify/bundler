@@ -21,8 +21,9 @@ module Bundler
     # For more information see the #run method on this class.
     def self.install(root, definition, options = {})
       installer = new(root, definition)
-      Plugin.hook("before-install-all", definition.dependencies)
+      Plugin.hook(Plugin::Events::GEM_BEFORE_INSTALL_ALL, definition.dependencies)
       installer.run(options)
+      Plugin.hook(Plugin::Events::GEM_AFTER_INSTALL_ALL, definition.dependencies)
       installer
     end
 
@@ -220,7 +221,7 @@ module Bundler
     def processor_count
       require "etc"
       Etc.nprocessors
-    rescue
+    rescue StandardError
       1
     end
 
@@ -302,7 +303,7 @@ module Bundler
 
     # returns whether or not a re-resolve was needed
     def resolve_if_needed(options)
-      if !@definition.unlocking? && !options["force"] && !Bundler.settings[:inline] && Bundler.default_lockfile.file?
+      if !@definition.unlocking? && !options["force"] && !options["all-platforms"] && !Bundler.settings[:inline] && Bundler.default_lockfile.file?
         return false if @definition.nothing_changed? && !@definition.missing_specs?
       end
 

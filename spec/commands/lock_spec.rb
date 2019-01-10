@@ -19,7 +19,7 @@ RSpec.describe "bundle lock" do
       gem "foo"
     G
 
-    @lockfile = strip_lockfile <<-L
+    @lockfile = strip_lockfile(normalize_uri_file(<<-L))
       GEM
         remote: file://localhost#{repo}/
         specs:
@@ -97,6 +97,14 @@ RSpec.describe "bundle lock" do
     expect { read_lockfile }.to raise_error(Errno::ENOENT)
   end
 
+  it "writes to custom location using --lockfile when a default lockfile is present" do
+    bundle "install"
+    bundle "lock --lockfile=lock"
+
+    expect(out).to match(/Writing lockfile to.+lock/)
+    expect(read_lockfile("lock")).to eq(@lockfile)
+  end
+
   it "update specific gems using --update" do
     lockfile @lockfile.gsub("2.3.2", "2.3.1").gsub("10.0.2", "10.0.1")
 
@@ -112,6 +120,19 @@ RSpec.describe "bundle lock" do
     expect(out).to eq("Could not find gem 'blahblah'.")
 
     expect(read_lockfile).to eq(@lockfile)
+  end
+
+  it "can lock without downloading gems" do
+    gemfile <<-G
+      source "file://#{gem_repo1}"
+
+      gem "thin"
+      gem "rack_middleware", :group => "test"
+    G
+    bundle! "config set without test"
+    bundle! "config set path .bundle"
+    bundle! "lock"
+    expect(bundled_app(".bundle")).not_to exist
   end
 
   # see update_spec for more coverage on same options. logic is shared so it's not necessary
@@ -236,7 +257,7 @@ RSpec.describe "bundle lock" do
 
     simulate_platform(mingw) { bundle! :lock }
 
-    expect(the_bundle.lockfile).to read_as(strip_whitespace(<<-G))
+    expect(the_bundle.lockfile).to read_as(normalize_uri_file(strip_whitespace(<<-G)))
       GEM
         remote: file://localhost#{gem_repo4}/
         specs:
@@ -261,7 +282,7 @@ RSpec.describe "bundle lock" do
 
     simulate_platform(rb) { bundle! :lock }
 
-    expect(the_bundle.lockfile).to read_as(strip_whitespace(<<-G))
+    expect(the_bundle.lockfile).to read_as(normalize_uri_file(strip_whitespace(<<-G)))
       GEM
         remote: file://localhost#{gem_repo4}/
         specs:

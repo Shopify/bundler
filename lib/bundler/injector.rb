@@ -12,6 +12,9 @@ module Bundler
       @options = options
     end
 
+    # @param [Pathname] gemfile_path The Gemfile in which to inject the new dependency.
+    # @param [Pathname] lockfile_path The lockfile in which to inject the new dependency.
+    # @return [Array]
     def inject(gemfile_path, lockfile_path)
       if Bundler.frozen_bundle?
         # ensure the lock and Gemfile are synced
@@ -28,7 +31,8 @@ module Bundler
         @new_deps -= builder.dependencies
 
         # add new deps to the end of the in-memory Gemfile
-        # Set conservative versioning to false because we want to let the resolver resolve the version first
+        # Set conservative versioning to false because
+        # we want to let the resolver resolve the version first
         builder.eval_gemfile("injected gems", build_gem_lines(false)) if @new_deps.any?
 
         # resolve to see if the new deps broke anything
@@ -58,7 +62,17 @@ module Bundler
       seg_end_index = version >= Gem::Version.new("1.0") ? 1 : 2
 
       prerelease_suffix = version.to_s.gsub(version.release.to_s, "") if version.prerelease?
-      "~> #{segments[0..seg_end_index].join(".")}#{prerelease_suffix}"
+      "#{version_prefix}#{segments[0..seg_end_index].join(".")}#{prerelease_suffix}"
+    end
+
+    def version_prefix
+      if @options[:strict]
+        "= "
+      elsif @options[:optimistic]
+        ">= "
+      else
+        "~> "
+      end
     end
 
     def build_gem_lines(conservative_versioning)

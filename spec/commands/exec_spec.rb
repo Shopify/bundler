@@ -606,6 +606,24 @@ RSpec.describe "bundle exec" do
       it_behaves_like "it runs"
     end
 
+    context "the executable raises an error without a backtrace", :bundler => "< 2" do
+      let(:executable) { super() << "\nclass Err < Exception\ndef backtrace; end;\nend\nraise Err" }
+      let(:exit_code) { 1 }
+      let(:expected) { super() << "\nbundler: failed to load command: #{path} (#{path})" }
+      let(:expected_err) { "Err: Err" }
+
+      it_behaves_like "it runs"
+    end
+
+    context "the executable raises an error without a backtrace", :bundler => "2" do
+      let(:executable) { super() << "\nclass Err < Exception\ndef backtrace; end;\nend\nraise Err" }
+      let(:exit_code) { 1 }
+      let(:expected_err) { "bundler: failed to load command: #{path} (#{path})\nErr: Err" }
+      let(:expected) { super() }
+
+      it_behaves_like "it runs"
+    end
+
     context "when the file uses the current ruby shebang" do
       let(:shebang) { "#!#{Gem.ruby}" }
       it_behaves_like "it runs"
@@ -771,6 +789,8 @@ __FILE__: #{path.to_s.inspect}
       end
 
       it "overrides disable_shared_gems so bundler can be found" do
+        skip "bundler 1.16.x is not support with Ruby 2.6 on Travis CI" if RUBY_VERSION >= "2.6"
+
         file = bundled_app("file_that_bundle_execs.rb")
         create_file(file, <<-RB)
           #!#{Gem.ruby}

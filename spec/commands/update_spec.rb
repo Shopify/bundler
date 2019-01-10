@@ -189,6 +189,23 @@ RSpec.describe "bundle update" do
       expect(the_bundle).not_to include_gems "rack 1.2"
     end
 
+    context "when conservatively updating a group with non-group sub-deps" do
+      it "should update only specified group gems" do
+        install_gemfile <<-G
+          source "file://#{gem_repo2}"
+          gem "activemerchant", :group => :development
+          gem "activesupport"
+        G
+        update_repo2 do
+          build_gem "activemerchant", "2.0"
+          build_gem "activesupport", "3.0"
+        end
+        bundle "update --conservative --group development"
+        expect(the_bundle).to include_gems "activemerchant 2.0"
+        expect(the_bundle).not_to include_gems "activesupport 3.0"
+      end
+    end
+
     context "when there is a source with the same name as a gem in a group" do
       before :each do
         build_git "foo", :path => lib_path("activesupport")
@@ -469,6 +486,47 @@ RSpec.describe "bundle update in more complicated situations" do
 
     bundle "update"
     expect(the_bundle).to include_gems "thin 1.0"
+  end
+
+  context "when the lockfile is for a different platform" do
+    before do
+      build_repo4 do
+        build_gem("a", "0.9")
+        build_gem("a", "0.9") {|s| s.platform = "java" }
+        build_gem("a", "1.1")
+        build_gem("a", "1.1") {|s| s.platform = "java" }
+      end
+
+      gemfile <<-G
+        source "file://#{gem_repo4}"
+        gem "a"
+      G
+
+      lockfile <<-L
+        GEM
+          remote: file://#{gem_repo4}
+          specs:
+            a (0.9-java)
+
+        PLATFORMS
+          java
+
+        DEPENDENCIES
+          a
+      L
+
+      simulate_platform linux
+    end
+
+    it "allows updating" do
+      bundle! :update, :all => true
+      expect(the_bundle).to include_gem "a 1.1"
+    end
+
+    it "allows updating a specific gem" do
+      bundle! "update a"
+      expect(the_bundle).to include_gem "a 1.1"
+    end
   end
 end
 

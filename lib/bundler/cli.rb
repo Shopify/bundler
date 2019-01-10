@@ -319,6 +319,8 @@ module Bundler
       "Specify a different shebang executable name than the default (usually 'ruby')"
     method_option "standalone", :type => :boolean, :banner =>
       "Make binstubs that can work without the Bundler runtime"
+    method_option "all", :type => :boolean, :banner =>
+      "Install binstubs for all gems"
     def binstubs(*gems)
       require "bundler/cli/binstubs"
       Binstubs.new(options, gems).run
@@ -331,10 +333,13 @@ module Bundler
     method_option "version", :aliases => "-v", :type => :string
     method_option "group", :aliases => "-g", :type => :string
     method_option "source", :aliases => "-s", :type => :string
-
-    def add(gem_name)
+    method_option "skip-install", :type => :boolean, :banner =>
+      "Adds gem to the Gemfile but does not install it"
+    method_option "optimistic", :type => :boolean, :banner => "Adds optimistic declaration of version to gem"
+    method_option "strict", :type => :boolean, :banner => "Adds strict declaration of version to gem"
+    def add(*gems)
       require "bundler/cli/add"
-      Add.new(options.dup, gem_name).run
+      Add.new(options.dup, gems).run
     end
 
     desc "outdated GEM [OPTIONS]", "List installed gems with newer versions available"
@@ -366,6 +371,8 @@ module Bundler
     method_option "filter-patch", :type => :boolean, :banner => "Only list patch newer versions"
     method_option "parseable", :aliases => "--porcelain", :type => :boolean, :banner =>
       "Use minimal formatting for more parseable output"
+    method_option "only-explicit", :type => :boolean, :banner =>
+      "Only list gems specified in your Gemfile, not their dependencies"
     def outdated(*gems)
       require "bundler/cli/outdated"
       Outdated.new(options, gems).run
@@ -745,7 +752,7 @@ module Bundler
       end
 
       Bundler.ui.warn "The latest bundler is #{latest}, but you are currently running #{current}.\n#{suggestion}"
-    rescue
+    rescue RuntimeError
       nil
     end
   end

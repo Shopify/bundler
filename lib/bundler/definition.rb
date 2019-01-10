@@ -120,8 +120,8 @@ module Bundler
       @source_changes = converge_sources
 
       unless @unlock[:lock_shared_dependencies]
-        eager_unlock = expand_dependencies(@unlock[:gems])
-        @unlock[:gems] = @locked_specs.for(eager_unlock).map(&:name)
+        eager_unlock = expand_dependencies(@unlock[:gems], true)
+        @unlock[:gems] = @locked_specs.for(eager_unlock, [], false, false, false).map(&:name)
       end
 
       @dependency_changes = converge_dependencies
@@ -167,7 +167,7 @@ module Bundler
     def specs
       @specs ||= begin
         begin
-          specs = resolve.materialize(Bundler.settings[:cache_all_platforms] ? dependencies : requested_dependencies)
+          specs = resolve.materialize(requested_dependencies)
         rescue GemNotFound => e # Handle yanked gem
           gem_name, gem_version = extract_gem_info(e)
           locked_gem = @locked_specs[gem_name].last
@@ -337,7 +337,8 @@ module Bundler
       end
 
       preserve_unknown_sections ||= !updating_major && (Bundler.frozen_bundle? || !(unlocking? || @unlocking_bundler))
-      return if lockfiles_equal?(@lockfile_contents, contents, preserve_unknown_sections)
+
+      return if file && File.exist?(file) && lockfiles_equal?(@lockfile_contents, contents, preserve_unknown_sections)
 
       if Bundler.frozen_bundle?
         Bundler.ui.error "Cannot write a changed lockfile while frozen."

@@ -159,12 +159,13 @@ module Bundler
     def user_home
       @user_home ||= begin
         home = Bundler.rubygems.user_home
+        bundle_home = home ? File.join(home, ".bundle") : nil
 
         warning = if home.nil?
           "Your home directory is not set."
         elsif !File.directory?(home)
           "`#{home}` is not a directory."
-        elsif !File.writable?(home)
+        elsif !File.writable?(home) && (!File.directory?(bundle_home) || !File.writable?(bundle_home))
           "`#{home}` is not writable."
         end
 
@@ -189,7 +190,7 @@ module Bundler
         end
         tmp_home_path.join(login).tap(&:mkpath)
       end
-    rescue => e
+    rescue RuntimeError => e
       raise e.exception("#{warning}\nBundler also failed to create a temporary home directory at `#{path}':\n#{e}")
     end
 
@@ -365,7 +366,7 @@ EOF
         bin_dir = bin_dir.parent until bin_dir.exist?
 
         # if any directory is not writable, we need sudo
-        files = [path, bin_dir] | Dir[path.join("build_info/*").to_s] | Dir[path.join("*").to_s]
+        files = [path, bin_dir] | Dir[bundle_path.join("build_info/*").to_s] | Dir[bundle_path.join("*").to_s]
         sudo_needed = files.any? {|f| !File.writable?(f) }
       end
 
@@ -373,8 +374,8 @@ EOF
       @requires_sudo = settings.allow_sudo? && sudo_present && sudo_needed
     end
 
-    def mkdir_p(path)
-      if requires_sudo?
+    def mkdir_p(path, options = {})
+      if requires_sudo? && !options[:no_sudo]
         sudo "mkdir -p '#{path}'" unless File.exist?(path)
       else
         SharedHelpers.filesystem_access(path, :write) do |p|
@@ -421,12 +422,14 @@ EOF
     end
 
     def read_file(file)
-      File.open(file, "rb", &:read)
+      SharedHelpers.filesystem_access(file, :read) do
+        File.open(file, "rb", &:read)
+      end
     end
 
     def load_marshal(data)
       Marshal.load(data)
-    rescue => e
+    rescue StandardError => e
       raise MarshalError, "#{e.class}: #{e.message}"
     end
 

@@ -5,6 +5,7 @@ require "bundler/plugin/api"
 module Bundler
   module Plugin
     autoload :DSL,        "bundler/plugin/dsl"
+    autoload :Events,     "bundler/plugin/events"
     autoload :Index,      "bundler/plugin/index"
     autoload :Installer,  "bundler/plugin/installer"
     autoload :SourceList, "bundler/plugin/source_list"
@@ -86,7 +87,7 @@ module Bundler
       installed_specs = Installer.new.install_definition(definition)
 
       save_plugins plugins, installed_specs, builder.inferred_plugins
-    rescue => e
+    rescue RuntimeError => e
       unless e.is_a?(GemfileError)
         Bundler.ui.error "Failed to install plugin: #{e.message}\n  #{e.backtrace[0]}"
       end
@@ -175,6 +176,9 @@ module Bundler
     # To be called via the API to register a hooks and corresponding block that
     # will be called to handle the hook
     def add_hook(event, &block)
+      unless Events.defined_event?(event)
+        raise ArgumentError, "Event '#{event}' not defined in Bundler::Plugin::Events"
+      end
       @hooks_by_event[event.to_s] << block
     end
 
@@ -186,6 +190,9 @@ module Bundler
     # @param [String] event
     def hook(event, *args, &arg_blk)
       return unless Bundler.feature_flag.plugins?
+      unless Events.defined_event?(event)
+        raise ArgumentError, "Event '#{event}' not defined in Bundler::Plugin::Events"
+      end
 
       plugins = index.hook_plugins(event)
       return unless plugins.any?
@@ -284,7 +291,7 @@ module Bundler
       load path.join(PLUGIN_FILE_NAME)
 
       @loaded_plugin_names << name
-    rescue => e
+    rescue RuntimeError => e
       Bundler.ui.error "Failed loading plugin #{name}: #{e.message}"
       raise
     end
